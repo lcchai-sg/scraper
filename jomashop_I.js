@@ -17,6 +17,9 @@ const { MongoClient } = require('mongodb');
   let ttl_time = 0;
   try {
     for (let i = 1; i <= lPage; i++) {
+      if ( i % 100 === 0 ) {
+        await new Promise((r)=> setTimeout(r, 2000));
+      }
       const link = `${entry}?p=${i}`
       console.log(link)
       const data = (await axios.get(link)).data;
@@ -35,15 +38,24 @@ const { MongoClient } = require('mongodb');
           url,
           source: 'jomashop',
           thumbnail,
+          scrapedOn: new Date(),
         });
       });
     }
 
     for (const result of results) {
+      console.log(result);
+      const { url, source, ...rest } = result;
       await conn.db(db)
       .collection('indexing_url')
-      .insertOne(result);
+      .updateOne(
+        { url, source },
+        { $set: { ...rest }},
+        { upsert: true },
+      );
     }
+
+    process.exit(0);
   } catch (error) {
     console.log(error)
   }
