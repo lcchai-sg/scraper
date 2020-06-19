@@ -1,10 +1,17 @@
+require('dotenv').config();
 const axios = require('axios');
 const cheerio = require('cheerio');
+const { MongoClient } = require('mongodb');
 
 (async () => {
-  const lPage = 200;
+  const lPage = 752;
   const base = 'https://www.jomashop.com/';
   const entry = 'https://www.jomashop.com/watches.html';
+
+  const conn = await MongoClient.connect(process.env.MONGO_URL, {
+    useUnifiedTopology: true,
+  });
+  const db = 'synopsis';
 
   const results = [];
   let ttl_time = 0;
@@ -14,7 +21,6 @@ const cheerio = require('cheerio');
       console.log(link)
       const data = (await axios.get(link)).data;
       const $ = cheerio.load(data);
-      const start = new Date();
 
       $('.products-grid li').each((idx, el) => {
         const url = $(el).find('a').attr('href');
@@ -24,21 +30,20 @@ const cheerio = require('cheerio');
         } else {
           thumbnail = $(el).find('a img').attr('src');
         }
-
+        
         results.push({
           url,
           source: 'jomashop',
           thumbnail,
         });
       });
-
-      const end = new Date();
-      ttl_time += end - start;
     }
 
-    console.log(`number of watches >>>`, results.length)
-    console.log(`total time elapsed >>> `, ttl_time)
-    console.log(`avg time >>> `, ttl_time / lPage)
+    for (const result of results) {
+      await conn.db(db)
+      .collection('indexing_url')
+      .insertOne(result);
+    }
   } catch (error) {
     console.log(error)
   }
